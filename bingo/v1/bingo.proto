@@ -2,10 +2,12 @@ syntax = "proto3";
 
 package bingo.v1;
 
+import "buf/validate/validate.proto";
+
 option go_package = "github.com/ericvolp12/bingo/gen/bingo/v1;bingov1";
 
 message LookupRequest {
-  string handle_or_did = 1;
+  string handle_or_did = 1 [(buf.validate.field).string.min_len = 1, (buf.validate.field).string.max_len = 512];
 }
 
 message LookupResponse {
@@ -16,7 +18,16 @@ message LookupResponse {
 }
 
 message BulkLookupRequest {
-  repeated string handles_or_dids = 1;
+  repeated string handles_or_dids = 1 [
+    (buf.validate.field).repeated.min_items = 1, 
+    (buf.validate.field).repeated.max_items = 20000, 
+    (buf.validate.field).repeated.items = {
+      string: {
+        min_len: 1,
+        max_len: 512
+      }
+    }
+  ];
 }
 
 message BulkLookupResponse {

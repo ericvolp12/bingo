@@ -106,17 +106,25 @@ func Bingo(cctx *cli.Context) error {
 		return err
 	}
 
+	log.Info("redis connection successful")
+
 	st, err := store.NewStore(ctx, redisClient, cctx.String("redis-prefix"), cctx.String("postgres-url"))
 	if err != nil {
 		return err
 	}
+
+	log.Info("store connection successful")
 
 	plc, err := plc.NewDirectory(cctx.String("plc-endpoint"), redisClient, st, cctx.String("redis-prefix"))
 	if err != nil {
 		return err
 	}
 
+	log.Info("plc connection successful")
+
 	plc.Start()
+
+	log.Info("plc started")
 
 	lookupServer := lookup.NewServer(st)
 

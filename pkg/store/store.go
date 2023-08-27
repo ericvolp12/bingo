@@ -85,7 +85,7 @@ func NewStore(
 	queries := store_queries.New(db)
 
 	// Iterate over all entries in postgres and set them in redis
-	pageSize := 1000
+	pageSize := 20000
 	offset := 0
 	for {
 		dbEntries, err := queries.GetEntries(ctx, store_queries.GetEntriesParams{

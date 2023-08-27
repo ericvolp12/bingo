@@ -6,17 +6,24 @@ import (
 	"log"
 
 	"connectrpc.com/connect"
+	protovalidate "github.com/bufbuild/protovalidate-go"
 	bingov1 "github.com/ericvolp12/bingo/gen/bingo/v1"
 	"github.com/ericvolp12/bingo/pkg/store"
 )
 
 type Server struct {
-	Store *store.Store
+	Store     *store.Store
+	validator *protovalidate.Validator
 }
 
 func NewServer(store *store.Store) *Server {
+	v, err := protovalidate.New()
+	if err != nil {
+		fmt.Println("failed to initialize validator:", err)
+	}
 	return &Server{
-		Store: store,
+		Store:     store,
+		validator: v,
 	}
 }
 
@@ -25,8 +32,8 @@ func (s *Server) Lookup(
 	req *connect.Request[bingov1.LookupRequest],
 ) (*connect.Response[bingov1.LookupResponse], error) {
 	log.Println("Lookup called")
-	if req.Msg.HandleOrDid == "" {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("handle or did cannot be empty"))
+	if err := s.validator.Validate(req.Msg); err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
 
 	entry, err := s.Store.Lookup(ctx, req.Msg.HandleOrDid)
@@ -50,8 +57,8 @@ func (s *Server) BulkLookup(
 	req *connect.Request[bingov1.BulkLookupRequest],
 ) (*connect.Response[bingov1.BulkLookupResponse], error) {
 	log.Println("BulkLookup called")
-	if len(req.Msg.HandlesOrDids) == 0 {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("handles or dids cannot be empty"))
+	if err := s.validator.Validate(req.Msg); err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
 
 	// Split the request into two slices, one for DIDs and one for handles.
