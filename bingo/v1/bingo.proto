@@ -3,6 +3,7 @@ syntax = "proto3";
 package bingo.v1;
 
 import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
 
 option go_package = "github.com/ericvolp12/bingo/gen/bingo/v1;bingov1";
 
@@ -14,7 +15,7 @@ message LookupResponse {
   string handle = 1;
   string did = 2;
   bool is_valid = 3;
-  uint64 last_checked_time = 4;
+  google.protobuf.Timestamp last_checked_time = 4;
 }
 
 message BulkLookupRequest {

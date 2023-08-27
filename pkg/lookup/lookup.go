@@ -9,6 +9,7 @@ import (
 	protovalidate "github.com/bufbuild/protovalidate-go"
 	bingov1 "github.com/ericvolp12/bingo/gen/bingo/v1"
 	"github.com/ericvolp12/bingo/pkg/store"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type Server struct {
@@ -45,7 +46,7 @@ func (s *Server) Lookup(
 		Handle:          entry.Handle,
 		Did:             entry.Did,
 		IsValid:         entry.IsValid,
-		LastCheckedTime: entry.LastCheckedTime,
+		LastCheckedTime: timestamppb.New(entry.LastCheckedTime),
 	})
 
 	res.Header().Set("Bingo-Version", "v1")
@@ -85,7 +86,7 @@ func (s *Server) BulkLookup(
 				Handle:          entry.Handle,
 				Did:             entry.Did,
 				IsValid:         entry.IsValid,
-				LastCheckedTime: entry.LastCheckedTime,
+				LastCheckedTime: timestamppb.New(entry.LastCheckedTime),
 			})
 		}
 	}
@@ -99,7 +100,7 @@ func (s *Server) BulkLookup(
 				Handle:          entry.Handle,
 				Did:             entry.Did,
 				IsValid:         entry.IsValid,
-				LastCheckedTime: entry.LastCheckedTime,
+				LastCheckedTime: timestamppb.New(entry.LastCheckedTime),
 			})
 		}
 	}

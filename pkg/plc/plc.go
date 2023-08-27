@@ -290,7 +290,7 @@ func (d *Directory) ValidateHandlePage(ctx context.Context, pageSize int) bool {
 				Did:             entry.Did,
 				Handle:          entry.Handle,
 				IsValid:         valid,
-				LastCheckedTime: uint64(time.Now().UnixNano()),
+				LastCheckedTime: time.Now(),
 			})
 			lk.Unlock()
 		}(entry)

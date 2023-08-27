@@ -25,10 +25,10 @@ type Store struct {
 }
 
 type Entry struct {
-	Handle          string `json:"handle"`
-	Did             string `json:"did"`
-	IsValid         bool   `json:"valid"`
-	LastCheckedTime uint64 `json:"checked"`
+	Handle          string    `json:"handle"`
+	Did             string    `json:"did"`
+	IsValid         bool      `json:"valid"`
+	LastCheckedTime time.Time `json:"checked"`
 }
 
 var ErrNotFound = errors.New("bingo: not found")
@@ -107,7 +107,7 @@ func NewStore(
 				Handle:          dbEntry.Handle,
 				Did:             dbEntry.Did,
 				IsValid:         dbEntry.IsValid,
-				LastCheckedTime: uint64(dbEntry.LastCheckedTime.Time.UnixNano()),
+				LastCheckedTime: dbEntry.LastCheckedTime.Time,
 			}
 
 			byDidKey := fmt.Sprintf("%s_%s_%s", prefix, byDidPrefix, entry.Did)
@@ -250,11 +250,9 @@ func (s *Store) Update(ctx context.Context, entry *Entry) error {
 	defer span.End()
 
 	lastCheckedSQLTime := sql.NullTime{}
-	if entry.LastCheckedTime != 0 {
-		lastCheckedSQLTime = sql.NullTime{
-			Time:  time.Unix(0, int64(entry.LastCheckedTime)),
-			Valid: true,
-		}
+	lastCheckedSQLTime = sql.NullTime{
+		Time:  entry.LastCheckedTime,
+		Valid: true,
 	}
 
 	// Update the entry in postgres
