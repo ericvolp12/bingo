@@ -20,7 +20,7 @@ func main() {
 	)
 	res, err := client.Lookup(
 		context.Background(),
-		connect.NewRequest(&bingov1.LookupRequest{HandleOrDid: "bingo"}),
+		connect.NewRequest(&bingov1.LookupRequest{HandleOrDid: "jaz.bsky.social"}),
 	)
 	if err != nil {
 		log.Println(err)
