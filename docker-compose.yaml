@@ -1,0 +1,35 @@
+version: '3.8'
+services:
+  bingo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    image: bingo
+    container_name: bingo
+    env_file:
+      - .env
+    ports:
+      - "8923:8080"
+  redis:
+    image: 'redis/redis-stack:latest'
+    ulimits:
+      memlock: -1
+    ports:
+      - 6380:6379
+    restart: always
+    volumes:
+      - ./redis_data:/data
+      - ./redis.conf:/redis-stack.conf
+  postgres:
+    image: postgres:14-alpine
+    restart: always
+    ports:
+      - "5435:5432"
+    environment:
+      POSTGRES_USER: localdev
+      POSTGRES_PASSWORD: localdev
+      POSTGRES_DB: bingo
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
+      - ./pkg/store/schema/schema.sql:/docker-entrypoint-initdb.d/schema.sql

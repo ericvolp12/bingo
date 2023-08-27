@@ -2,19 +2,26 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
+	"github.com/XSAM/otelsql"
+	"github.com/ericvolp12/bingo/pkg/store/store_queries"
 	"github.com/redis/go-redis/v9"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 )
 
 type Store struct {
 	RedisPrefix string
 	Redis       *redis.Client
+	DB          *sql.DB
+	Queries     *store_queries.Queries
 }
 
 type Entry struct {
@@ -31,13 +38,103 @@ var tracer = otel.Tracer("bingo/store")
 var byDidPrefix = "d"
 var byHandlePrefix = "h"
 
-func NewStore(ctx context.Context, client *redis.Client, prefix string) (*Store, error) {
+func NewStore(
+	ctx context.Context,
+	client *redis.Client,
+	prefix string,
+	postgresConnect string,
+) (*Store, error) {
 	ctx, span := tracer.Start(ctx, "NewStore")
 	defer span.End()
+
+	var db *sql.DB
+	var err error
+
+	for i := 0; i < 5; i++ {
+		db, err = otelsql.Open(
+			"postgres",
+			postgresConnect,
+			otelsql.WithAttributes(semconv.DBSystemPostgreSQL),
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		db.SetMaxOpenConns(50)
+
+		err = otelsql.RegisterDBStatsMetrics(db, otelsql.WithAttributes(
+			semconv.DBSystemPostgreSQL,
+		))
+		if err != nil {
+			return nil, err
+		}
+
+		err = db.Ping()
+		if err == nil {
+			break
+		}
+
+		db.Close() // Close the connection if it failed.
+		time.Sleep(5 * time.Second)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	queries := store_queries.New(db)
+
+	// Iterate over all entries in postgres and set them in redis
+	pageSize := 1000
+	offset := 0
+	for {
+		dbEntries, err := queries.GetEntries(ctx, store_queries.GetEntriesParams{
+			Limit:  int32(pageSize),
+			Offset: int32(offset),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("bingo: failed to list entries: %w", err)
+		}
+
+		if len(dbEntries) == 0 {
+			break
+		}
+
+		pipeline := client.Pipeline()
+
+		for _, dbEntry := range dbEntries {
+			entry := &Entry{
+				Handle:          dbEntry.Handle,
+				Did:             dbEntry.Did,
+				IsValid:         dbEntry.IsValid,
+				LastCheckedTime: uint64(dbEntry.LastCheckedTime.Time.UnixNano()),
+			}
+
+			byDidKey := fmt.Sprintf("%s_%s_%s", prefix, byDidPrefix, entry.Did)
+			byHandleKey := fmt.Sprintf("%s_%s_%s", prefix, byHandlePrefix, entry.Handle)
+
+			val, err := json.Marshal(entry)
+			if err != nil {
+				return nil, fmt.Errorf("bingo: failed to marshal entry: %w", err)
+			}
+
+			pipeline.Set(ctx, byDidKey, val, 0)
+			pipeline.Set(ctx, byHandleKey, val, 0)
+		}
+
+		_, err = pipeline.Exec(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("bingo: failed to execute pipeline: %w", err)
+		}
+
+		offset += pageSize
+	}
 
 	return &Store{
 		RedisPrefix: prefix,
 		Redis:       client,
+		DB:          db,
+		Queries:     queries,
 	}, nil
 }
 
@@ -152,6 +249,26 @@ func (s *Store) Update(ctx context.Context, entry *Entry) error {
 	ctx, span := tracer.Start(ctx, "Update")
 	defer span.End()
 
+	lastCheckedSQLTime := sql.NullTime{}
+	if entry.LastCheckedTime != 0 {
+		lastCheckedSQLTime = sql.NullTime{
+			Time:  time.Unix(0, int64(entry.LastCheckedTime)),
+			Valid: true,
+		}
+	}
+
+	// Update the entry in postgres
+	err := s.Queries.UpdateEntry(ctx, store_queries.UpdateEntryParams{
+		Handle:          entry.Handle,
+		Did:             entry.Did,
+		IsValid:         entry.IsValid,
+		LastCheckedTime: lastCheckedSQLTime,
+	})
+	if err != nil {
+		return fmt.Errorf("bingo: failed to update entry: %w", err)
+	}
+
+	// Set the entry in redis
 	byDidKey := fmt.Sprintf("%s_%s_%s", s.RedisPrefix, byDidPrefix, entry.Did)
 	byHandleKey := fmt.Sprintf("%s_%s_%s", s.RedisPrefix, byHandlePrefix, entry.Handle)
 
@@ -192,6 +309,74 @@ func (s *Store) Update(ctx context.Context, entry *Entry) error {
 	err = s.Redis.Set(ctx, byHandleKey, val, 0).Err()
 	if err != nil {
 		return fmt.Errorf("bingo: failed to set entry by handle: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Store) BulkUpdateEntryValidation(ctx context.Context, entries []*Entry) error {
+	ctx, span := tracer.Start(ctx, "BulkUpdateEntries")
+	defer span.End()
+
+	// Split valid and invalid entries
+	validDids := []string{}
+	invalidDids := []string{}
+
+	for _, entry := range entries {
+		if entry.IsValid {
+			validDids = append(validDids, entry.Did)
+		} else {
+			invalidDids = append(invalidDids, entry.Did)
+		}
+	}
+
+	lastCheckedSQLTime := sql.NullTime{
+		Time:  time.Now(),
+		Valid: true,
+	}
+
+	// Update entries in two batches, one for valid entries and one for invalid entries
+	if len(validDids) > 0 {
+		err := s.Queries.UpdateEntriesValidation(ctx, store_queries.UpdateEntriesValidationParams{
+			LastCheckedTime: lastCheckedSQLTime,
+			IsValid:         true,
+			Dids:            validDids,
+		})
+		if err != nil {
+			return fmt.Errorf("bingo: failed to update entries: %w", err)
+		}
+	}
+	if len(invalidDids) > 0 {
+		err := s.Queries.UpdateEntriesValidation(ctx, store_queries.UpdateEntriesValidationParams{
+			LastCheckedTime: lastCheckedSQLTime,
+			IsValid:         false,
+			Dids:            invalidDids,
+		})
+		if err != nil {
+			return fmt.Errorf("bingo: failed to update entries: %w", err)
+		}
+	}
+
+	// Set the entries in redis
+	pipeline := s.Redis.Pipeline()
+
+	for _, entry := range entries {
+		byDidKey := fmt.Sprintf("%s_%s_%s", s.RedisPrefix, byDidPrefix, entry.Did)
+		byHandleKey := fmt.Sprintf("%s_%s_%s", s.RedisPrefix, byHandlePrefix, entry.Handle)
+
+		// Set both entries
+		val, err := json.Marshal(entry)
+		if err != nil {
+			return fmt.Errorf("bingo: failed to marshal entry: %w", err)
+		}
+
+		pipeline.Set(ctx, byDidKey, val, 0)
+		pipeline.Set(ctx, byHandleKey, val, 0)
+	}
+
+	_, err := pipeline.Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("bingo: failed to execute pipeline: %w", err)
 	}
 
 	return nil

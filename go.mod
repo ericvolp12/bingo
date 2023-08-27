@@ -4,7 +4,9 @@ go 1.20
 
 require (
 	connectrpc.com/connect v1.11.1
+	github.com/XSAM/otelsql v0.23.0
 	github.com/ericvolp12/connect-go-prometheus v0.0.1
+	github.com/lib/pq v1.10.9
 	github.com/prometheus/client_golang v1.16.0
 	github.com/redis/go-redis/v9 v9.1.0
 	github.com/urfave/cli/v2 v2.25.7

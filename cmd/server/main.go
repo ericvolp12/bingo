@@ -32,7 +32,7 @@ func main() {
 		&cli.IntFlag{
 			Name:    "port",
 			Usage:   "port to listen on",
-			Value:   8923,
+			Value:   8080,
 			EnvVars: []string{"PORT"},
 		},
 		&cli.StringFlag{
@@ -46,6 +46,12 @@ func main() {
 			Usage:   "redis prefix for storing entries",
 			Value:   "bingo",
 			EnvVars: []string{"REDIS_PREFIX"},
+		},
+		&cli.StringFlag{
+			Name:    "postgres-url",
+			Usage:   "postgres connection string",
+			Value:   "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable",
+			EnvVars: []string{"POSTGRES_URL"},
 		},
 	}
 
@@ -73,7 +79,7 @@ func Bingo(cctx *cli.Context) error {
 		return err
 	}
 
-	st, err := store.NewStore(ctx, redisClient, cctx.String("redis-prefix"))
+	st, err := store.NewStore(ctx, redisClient, cctx.String("redis-prefix"), cctx.String("postgres-url"))
 	if err != nil {
 		return err
 	}

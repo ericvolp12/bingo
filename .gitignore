@@ -21,3 +21,8 @@
 go.work
 
 .vscode/
+bin/
+.env
+
+redis_data/
+postgres_data/
