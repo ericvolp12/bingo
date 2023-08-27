@@ -35,11 +35,14 @@ const (
 const (
 	// BingoServiceLookupProcedure is the fully-qualified name of the BingoService's Lookup RPC.
 	BingoServiceLookupProcedure = "/bingo.v1.BingoService/Lookup"
+	// BingoServiceBulkLookupProcedure is the fully-qualified name of the BingoService's BulkLookup RPC.
+	BingoServiceBulkLookupProcedure = "/bingo.v1.BingoService/BulkLookup"
 )
 
 // BingoServiceClient is a client for the bingo.v1.BingoService service.
 type BingoServiceClient interface {
 	Lookup(context.Context, *connect.Request[v1.LookupRequest]) (*connect.Response[v1.LookupResponse], error)
+	BulkLookup(context.Context, *connect.Request[v1.BulkLookupRequest]) (*connect.Response[v1.BulkLookupResponse], error)
 }
 
 // NewBingoServiceClient constructs a client for the bingo.v1.BingoService service. By default, it
@@ -57,12 +60,18 @@ func NewBingoServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			baseURL+BingoServiceLookupProcedure,
 			opts...,
 		),
+		bulkLookup: connect.NewClient[v1.BulkLookupRequest, v1.BulkLookupResponse](
+			httpClient,
+			baseURL+BingoServiceBulkLookupProcedure,
+			opts...,
+		),
 	}
 }
 
 // bingoServiceClient implements BingoServiceClient.
 type bingoServiceClient struct {
-	lookup *connect.Client[v1.LookupRequest, v1.LookupResponse]
+	lookup     *connect.Client[v1.LookupRequest, v1.LookupResponse]
+	bulkLookup *connect.Client[v1.BulkLookupRequest, v1.BulkLookupResponse]
 }
 
 // Lookup calls bingo.v1.BingoService.Lookup.
@@ -70,9 +79,15 @@ func (c *bingoServiceClient) Lookup(ctx context.Context, req *connect.Request[v1
 	return c.lookup.CallUnary(ctx, req)
 }
 
+// BulkLookup calls bingo.v1.BingoService.BulkLookup.
+func (c *bingoServiceClient) BulkLookup(ctx context.Context, req *connect.Request[v1.BulkLookupRequest]) (*connect.Response[v1.BulkLookupResponse], error) {
+	return c.bulkLookup.CallUnary(ctx, req)
+}
+
 // BingoServiceHandler is an implementation of the bingo.v1.BingoService service.
 type BingoServiceHandler interface {
 	Lookup(context.Context, *connect.Request[v1.LookupRequest]) (*connect.Response[v1.LookupResponse], error)
+	BulkLookup(context.Context, *connect.Request[v1.BulkLookupRequest]) (*connect.Response[v1.BulkLookupResponse], error)
 }
 
 // NewBingoServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -86,10 +101,17 @@ func NewBingoServiceHandler(svc BingoServiceHandler, opts ...connect.HandlerOpti
 		svc.Lookup,
 		opts...,
 	)
+	bingoServiceBulkLookupHandler := connect.NewUnaryHandler(
+		BingoServiceBulkLookupProcedure,
+		svc.BulkLookup,
+		opts...,
+	)
 	return "/bingo.v1.BingoService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case BingoServiceLookupProcedure:
 			bingoServiceLookupHandler.ServeHTTP(w, r)
+		case BingoServiceBulkLookupProcedure:
+			bingoServiceBulkLookupHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -101,4 +123,8 @@ type UnimplementedBingoServiceHandler struct{}
 
 func (UnimplementedBingoServiceHandler) Lookup(context.Context, *connect.Request[v1.LookupRequest]) (*connect.Response[v1.LookupResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("bingo.v1.BingoService.Lookup is not implemented"))
+}
+
+func (UnimplementedBingoServiceHandler) BulkLookup(context.Context, *connect.Request[v1.BulkLookupRequest]) (*connect.Response[v1.BulkLookupResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("bingo.v1.BingoService.BulkLookup is not implemented"))
 }

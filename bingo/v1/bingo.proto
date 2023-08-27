@@ -15,6 +15,16 @@ message LookupResponse {
     uint64 last_checked_time = 4;
 }
 
+message BulkLookupRequest {
+  repeated string handles_or_dids = 1;
+}
+
+message BulkLookupResponse {
+  repeated LookupResponse responses = 1;
+}
+
 service BingoService {
   rpc Lookup(LookupRequest) returns (LookupResponse) {}
+  rpc BulkLookup(BulkLookupRequest) returns (BulkLookupResponse) {} 
 }
+
