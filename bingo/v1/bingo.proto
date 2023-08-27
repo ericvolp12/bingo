@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package bingo.v1;
+
+option go_package = "github.com/ericvolp12/bingo/gen/bingo/v1;bingov1";
+
+message LookupRequest {
+  string handle_or_did = 1;
+}
+
+message LookupResponse {
+  string handle = 1;
+    string did = 2;
+    bool is_valid = 3;
+    uint64 last_checked_time = 4;
+}
+
+service BingoService {
+  rpc Lookup(LookupRequest) returns (LookupResponse) {}
+}
