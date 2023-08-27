@@ -1,5 +1,5 @@
 # bingo
-> Bingo knows everyone's name-o
+> [Bingo knows everyone's name-o](https://youtu.be/y8OnoxKotPQ?si=TXmIfF6LEYcbwbc7&t=16)
 
 Bingo is a DID <-> Handle resolution service for ATProto.
 
