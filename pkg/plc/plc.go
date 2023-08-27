@@ -96,7 +96,7 @@ func NewDirectory(endpoint string, redisClient *redis.Client, store *store.Store
 		Endpoint:       endpoint,
 		Logger:         logger,
 		PLCRateLimiter: rate.NewLimiter(rate.Limit(2), 1),
-		PDSRateLimiter: rate.NewLimiter(rate.Limit(10), 1),
+		PDSRateLimiter: rate.NewLimiter(rate.Limit(20), 1),
 		CheckPeriod:    30 * time.Second,
 		AfterCursor:    lastCursor,
 
@@ -187,7 +187,7 @@ func (d *Directory) fetchDirectoryEntries(ctx context.Context) {
 		for _, entry := range newEntries {
 			if len(entry.Operation.AlsoKnownAs) > 0 {
 				handle := strings.TrimPrefix(entry.Operation.AlsoKnownAs[0], "at://")
-				if handle != "" {
+				if handle != "" && len(handle) < 254 {
 					err := d.Store.Update(ctx, &store.Entry{
 						Did:     entry.Did,
 						Handle:  handle,
