@@ -86,7 +86,7 @@ func (s *Store) BulkLookupByDid(ctx context.Context, dids []string) ([]*Entry, e
 	}
 
 	results, err := pipeline.Exec(ctx)
-	if err != nil {
+	if err != nil && err != redis.Nil {
 		return nil, fmt.Errorf("bingo: failed to execute pipeline: %w", err)
 	}
 
@@ -124,7 +124,7 @@ func (s *Store) BulkLookupByHandle(ctx context.Context, handles []string) ([]*En
 	}
 
 	results, err := pipeline.Exec(ctx)
-	if err != nil {
+	if err != nil && err != redis.Nil {
 		return nil, fmt.Errorf("bingo: failed to execute pipeline: %w", err)
 	}
 
